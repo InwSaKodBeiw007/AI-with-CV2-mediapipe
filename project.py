@@ -48,10 +48,7 @@ def sendto(fingers, canvas, last_send_time, cooldown=2.0):
         if current_time - last_send_time >= cooldown:
             filename = f"drawing_{int(current_time)}.png"
             filepath = os.path.join("temp", filename)
-            
-            # สร้างโฟลเดอร์ temp ถ้ายังไม่มี
-            os.makedirs("temp", exist_ok=True)
-            
+              
             # บันทึกภาพ canvas
             cv2.imwrite(filepath, canvas)
             with open(filepath,'rb') as screenshot:
