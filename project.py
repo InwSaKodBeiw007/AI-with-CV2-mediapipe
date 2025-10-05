@@ -1,7 +1,7 @@
 from cvzone.HandTrackingModule import HandDetector
 import cv2
 import numpy as np
-import requests, time, os
+import requests, time, os, threading
 
 def getHandinfo(img):
     
@@ -33,14 +33,28 @@ def draw(info,previous_pos,canvas):
 
 
 
+def _send_file_async(filepath, filename, url):
+    try:
+        with open(filepath, 'rb') as screenshot:
+            files = {'file': (filename, screenshot, 'image/png')}
+            response = requests.post(url, files=files, timeout=10)
+            # print(f'sended! with :{response.json()}')
+            # print(f"  URL : {response.json().get('url', 'N/A')}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending file: {e}")
+    finally:
+        # Clean up the temporary file after sending
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
 def sendto(fingers, canvas, last_send_time, cooldown=2.0):
-    '''
+    """
         last_send_time: เวลาที่ส่งล่าสุด
         cooldown: ระยะเวลารอระหว่างการส่ง (วินาที)
     
         Returns:
             เวลาปัจจุบัน ถ้าส่งไปแล้ว, มิฉะนั้นคืนค่า last_send_time
-    '''
+    """
     if fingers == [1,0,0,0,1]:
         current_time = time.time()
             
@@ -51,15 +65,10 @@ def sendto(fingers, canvas, last_send_time, cooldown=2.0):
               
             # บันทึกภาพ canvas
             cv2.imwrite(filepath, canvas)
-            with open(filepath,'rb') as screenshot:
-                files = {'file':(filename,screenshot,'image/png')}
-                response = requests.post(url,files=files)
-            try:
-                print(f'sended! with :{response.json()}')
-                print(f"  URL : {response.json().get('url', 'N/A')}")
-            except:
-                print(f"fail : {response.status_code}")
 
+            # Start a new thread to send the file
+            sender_thread = threading.Thread(target=_send_file_async, args=(filepath, filename, url))
+            sender_thread.start()
 
         return current_time
     return last_send_time
