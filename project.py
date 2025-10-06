@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 import requests, time, os, threading
 
+from flask import Flask, jsonify,request
+
 def getHandinfo(img):
     
     # Find hands in the current frame
@@ -31,19 +33,6 @@ def draw(info,previous_pos,canvas):
         cv2.line(img=canvas,pt1=current_pos,pt2=previous_pos,color=(255,0,255),thickness=10)
     return current_pos,canvas
 
-def _get_answer_from_n8n(get_filepath):
-    """
-    ดึงคำตอบล่าสุดจาก Flask ที่รับข้อมูลมาจาก n8n
-    """
-    try:
-        url = "http://localhost:8000/get-latest-answer"
-        response = requests.get(url, timeout=3)
-        response.raise_for_status()
-        data = response.json()
-        return data.get("answer")
-    except Exception as e:
-        print(f"Error fetching answer from Flask: {e}")
-        return None
 
 def _send_file_async(filepath, filename, url):
     try:
@@ -58,8 +47,7 @@ def _send_file_async(filepath, filename, url):
         # Clean up the temporary file after sending
         if os.path.exists(filepath):
             os.remove(filepath)
-
-def sendto(fingers, canvas, last_send_time, cooldown=2.0):
+def sendto(fingers, canvas, last_send_time, cooldown=3):
     """
         last_send_time: เวลาที่ส่งล่าสุด
         cooldown: ระยะเวลารอระหว่างการส่ง (วินาที)
@@ -67,6 +55,7 @@ def sendto(fingers, canvas, last_send_time, cooldown=2.0):
         Returns:
             เวลาปัจจุบัน ถ้าส่งไปแล้ว, มิฉะนั้นคืนค่า last_send_time
     """
+    global latest_answer_from_thread ##  main loop จะเห็น latest_answer_from_thread ทันที
     if fingers == [1,0,0,0,1]:
         current_time = time.time()
             
@@ -78,9 +67,7 @@ def sendto(fingers, canvas, last_send_time, cooldown=2.0):
             # บันทึกภาพ canvas
             cv2.imwrite(filepath, canvas)
 
-            # Start a new thread to send the file
-            sender_thread = threading.Thread(target=_send_file_async, args=(filepath, filename, url))
-            sender_thread.start()
+            threading.Thread(target=_send_file_async, args=(filepath, filename, url), daemon=True).start()  ## send post requests
 
         return current_time
     return last_send_time
@@ -97,17 +84,27 @@ def main():
         if not success:
             break
         if canvas is None: canvas = np.zeros_like(img)
-        ''''''
-        if answer is None: answer = np.zeros_like(img)
 
         #ML handdetection
         result = getHandinfo(img)
         if result:
             fingers,lmlist = result
             previous_pos,canvas = draw(result,previous_pos,canvas)
-            last_send_time = sendto(fingers,canvas,last_send_time,cooldown=2.0) ## this should trigger just once maybe use delay or something? idk
+            last_send_time = sendto(fingers,canvas,last_send_time,cooldown=3) ## this cooldown for delay requests
 
         combine_cans = cv2.addWeighted(src1=img,alpha=0.7,src2=canvas,beta=0.4,gamma=0)
+
+        ''''''
+        # อัพเดท answer จาก thread
+        if latest_answer_from_thread:
+            answer = latest_answer_from_thread
+
+        # Fixed: Check if answer is a string (not None and not a numpy array)
+        if answer is not None and isinstance(answer, str):
+            text_size = cv2.getTextSize(answer, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)[0]
+            text_x = combine_cans.shape[1] - text_size[0] - 10
+            text_y = text_size[1] + 10
+            cv2.putText(combine_cans, answer, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
         # Display the image in a window
         cv2.imshow("Image", img)
@@ -123,17 +120,31 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
 
+
 cap = cv2.VideoCapture(0)
 # Initialize the HandDetector class with the given parameters
 detector = HandDetector(staticMode=False, maxHands=1, modelComplexity=1, detectionCon=0.5, minTrackCon=0.5)
 cap.set(3,1280)
 cap.set(4,720)
 
-
-
 url = "http://localhost:8000/uploads"
-get_filepath = ""
 
+''''''
+app = Flask(__name__)
+
+@app.route('/new-answer', methods=['POST'])
+def new_answer():
+    global latest_answer_from_thread
+    data = request.json or {}
+    answer = data.get("answer")
+    latest_answer_from_thread = answer
+    return jsonify({"status": "received"})
+
+latest_answer_from_thread = None
+
+def run_listener():
+    app.run(port=9000, debug=False, use_reloader=False)
+threading.Thread(target=run_listener, daemon=True).start()
 
 if __name__ == "__main__":
     main()
