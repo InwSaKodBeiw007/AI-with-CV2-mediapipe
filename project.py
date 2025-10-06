@@ -31,7 +31,19 @@ def draw(info,previous_pos,canvas):
         cv2.line(img=canvas,pt1=current_pos,pt2=previous_pos,color=(255,0,255),thickness=10)
     return current_pos,canvas
 
-
+def _get_answer_from_n8n(get_filepath):
+    """
+    ดึงคำตอบล่าสุดจาก Flask ที่รับข้อมูลมาจาก n8n
+    """
+    try:
+        url = "http://localhost:8000/get-latest-answer"
+        response = requests.get(url, timeout=3)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("answer")
+    except Exception as e:
+        print(f"Error fetching answer from Flask: {e}")
+        return None
 
 def _send_file_async(filepath, filename, url):
     try:
@@ -77,6 +89,7 @@ def main():
     previous_pos = None
     canvas = None
     last_send_time = 0
+    answer = None
     while True:
         success, img = cap.read()
         img = cv2.flip(img,1)
@@ -84,6 +97,8 @@ def main():
         if not success:
             break
         if canvas is None: canvas = np.zeros_like(img)
+        ''''''
+        if answer is None: answer = np.zeros_like(img)
 
         #ML handdetection
         result = getHandinfo(img)
@@ -117,6 +132,7 @@ cap.set(4,720)
 
 
 url = "http://localhost:8000/uploads"
+get_filepath = ""
 
 
 if __name__ == "__main__":
