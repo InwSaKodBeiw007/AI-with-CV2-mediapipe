@@ -38,7 +38,7 @@ def _send_file_async(filepath, filename, url):
     try:
         with open(filepath, 'rb') as screenshot:
             files = {'file': (filename, screenshot, 'image/png')}
-            response = requests.post(url, files=files, timeout=10)
+            requests.post(url, files=files, timeout=10)
             # print(f'sended! with :{response.json()}')
             # print(f"  URL : {response.json().get('url', 'N/A')}")
     except requests.exceptions.RequestException as e:
@@ -134,16 +134,20 @@ app = Flask(__name__)
 
 @app.route('/new-answer', methods=['POST'])
 def new_answer():
-    global latest_answer_from_thread
     data = request.json or {}
-    answer = data.get("answer")
-    latest_answer_from_thread = answer
+
+    def answerPoint():
+        global latest_answer_from_thread
+        answer = data.get("answer")
+        latest_answer_from_thread = answer
+        
+    threading.Thread(target=answerPoint, daemon=True).start()
     return jsonify({"status": "received"})
 
 latest_answer_from_thread = None
 
 def run_listener():
-    app.run(port=9000, debug=False, use_reloader=False)
+    app.run(port=9000, debug=False)
 threading.Thread(target=run_listener, daemon=True).start()
 
 if __name__ == "__main__":
