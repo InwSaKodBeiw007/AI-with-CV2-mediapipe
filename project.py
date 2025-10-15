@@ -136,12 +136,12 @@ app = Flask(__name__)
 def new_answer():
     data = request.json or {}
 
-    def answerPoint():
+    def answerPoint(data):
         global latest_answer_from_thread
         answer = data.get("answer")
         latest_answer_from_thread = answer
         
-    threading.Thread(target=answerPoint, daemon=True).start()
+    threading.Thread(target=answerPoint,args=(data,), daemon=True).start()  ## edited
     return jsonify({"status": "received"})
 
 latest_answer_from_thread = None
