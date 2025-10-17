@@ -1,3 +1,9 @@
+# THIS BRANCH 
+i found out thats UBUNTU is the gorgeous linuxOS then i try some with,
+i tried docker container and docker compose with no docker desktop and magical loved it!
+So i've now import this project to linux success congratulations!!! 5555
+
+
 # AI-with-CV2-mediapipe
 Draw image on openCV to AI model mediapipe.
 
