@@ -1,0 +1,5 @@
+cvzone
+numpy
+requests
+flask
+mediapipe
