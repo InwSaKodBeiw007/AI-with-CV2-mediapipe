@@ -1,5 +1,5 @@
 # AI-with-CV2-mediapipe
-Draw image on openCV to AI model mediapipe.
+Draw image on openCV to AI model mediapipe. with Python script i create blank screen for drawing then send the blank drawed screen to LLM by n8n webhook just when LLM finished the question, n8n send the answer back to server that opening blank screen through api (they share same address by DOCKER local_ip) 
 
 ___
 I have looking deep for this mediapipe and found just little thing!
